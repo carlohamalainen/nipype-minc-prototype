@@ -154,8 +154,6 @@ class ConvertTask(CommandLine):
         outputs['output_file'] = self.inputs.output_file
         return outputs
 
-
-
 class CopyInputSpec(CommandLineInputSpec):
     """
     Implement minccopy? Its man page says:
@@ -212,6 +210,75 @@ class CopyTask(CommandLine):
         outputs['output_file'] = self.inputs.output_file
         return outputs
 
+class ToEcatInputSpec(CommandLineInputSpec):
+    input_file = File(
+                    desc='input file to convert',
+                    exists=True,
+                    mandatory=True,
+                    argstr='%s',
+                    position=-2,)
+
+    output_file = File(
+                    desc='output file',
+                    mandatory=False,
+                    genfile=True,
+                    argstr='%s',
+                    position=-1,)
+
+    ignore_patient_variable = traits.Bool(
+                    desc='Ignore informations from the minc patient variable.',
+                    argstr='-ignore_patient_variable',)
+
+    ignore_study_variable = traits.Bool(
+                    desc='Ignore informations from the minc study variable.',
+                    argstr='-ignore_study_variable',)
+
+    ignore_acquisition_variable = traits.Bool(
+                    desc='Ignore informations from the minc acquisition variable.',
+                    argstr='-ignore_acquisition_variable',)
+
+    ignore_ecat_acquisition_variable = traits.Bool(
+                    desc='Ignore informations from the minc ecat_acquisition variable.',
+                    argstr='-ignore_ecat_acquisition_variable',)
+
+    ignore_ecat_main = traits.Bool(
+                    desc='Ignore informations from the minc ecat-main variable.',
+                    argstr='-ignore_ecat_main',)
+
+    ignore_ecat_subheader_variable = traits.Bool(
+                    desc='Ignore informations from the minc ecat-subhdr variable.',
+                    argstr='-ignore_ecat_subheader_variable',)
+
+    no_decay_corr_fctr = traits.Bool(
+                    desc='Do not compute the decay correction factors',
+                    argstr='-no_decay_corr_fctr',)
+
+    voxels_as_integers = traits.Bool(
+                    desc='Voxel values are treated as integers, scale and calibration factors are set to unity',
+                    argstr='-label',)
+
+class ToEcatOutputSpec(TraitedSpec):
+    # FIXME Am I defining the output spec correctly?
+    output_file = File(
+                    desc='output file',
+                    exists=True,)
+
+class ToEcatTask(CommandLine):
+    input_spec  = ToEcatInputSpec
+    output_spec = ToEcatOutputSpec
+    cmd = 'minctoecat'
+
+    def _list_outputs(self):
+        # FIXME seems generic, is this necessary?
+        outputs = self.output_spec().get()
+        outputs['output_file'] = self.inputs.output_file
+        return outputs
+
+    def _gen_filename(self, name):
+        if name == 'output_file':
+            return os.path.splitext(self.inputs.input_file)[0] + '.v' 
+        return None
+
 if __name__ == '__main__':
     convert = ConvertTask(input_file='/home/carlo/tmp/foo.mnc', output_file='/tmp/foo.mnc', two=True, clobber=True, compression=3, chunk=2, template=True)
     print convert.cmdline
@@ -229,4 +296,14 @@ if __name__ == '__main__':
 
     copy = CopyTask(input_file='/home/carlo/tmp/foo.mnc', output_file='/tmp/foo_copy.mnc')
     print copy.cmdline
+    # FIXME minccopy fails on my sample file...
+
+    print
+    print
+
+    toecat1 = ToEcatTask(input_file='/home/carlo/tmp/foo.mnc', ignore_patient_variable=True) # output not specified, uses _gen_filename()
+    print toecat1.cmdline
+
+    toecat2 = ToEcatTask(input_file='/home/carlo/tmp/foo.mnc', output_file='/tmp/sdfsdf.v') # output_file specified
+    print toecat2.cmdline
 
