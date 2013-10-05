@@ -5,15 +5,100 @@
 # Author: Carlo Hamalainen <carlo@carlo-hamalainen.net>
 #         http://carlo-hamalainen.net
 
+# TODO Check exit-code behaviour of minc commands.
+
 from nipype.interfaces.base import (
     TraitedSpec,
     CommandLineInputSpec,
     CommandLine,
-    File
+    StdOutCommandLineInputSpec,
+    StdOutCommandLine,
+    File,
+    traits,
 )
+
 import os
 
-from nipype.interfaces.base import (traits, TraitedSpec, OutputMultiPath, File, isdefined)
+class ToRawInputSpec(StdOutCommandLineInputSpec):
+    """
+    For the MINC command minctoraw.
+    """
+
+    input_file = File(
+                    desc='input file',
+                    exists=True,
+                    mandatory=True,
+                    argstr='%s',
+                    position=-2,)
+
+    write_byte = traits.Bool(
+                desc='Write out data as bytes',
+                argstr='-byte',)
+
+    write_short = traits.Bool(
+                desc='Write out data as short integers',
+                argstr='-short',)
+
+    write_int = traits.Bool(
+                desc='Write out data as 32-bit integers',
+                argstr='-int',)
+
+    write_long = traits.Bool(
+                desc='Superseded by -int',
+                argstr='-long',)
+ 
+    write_float = traits.Bool(
+                desc='Write out data as single precision floating-point values',
+                argstr='-float',)
+
+    write_double = traits.Bool(
+                desc='Write out data as double precision floating-point values',
+                argstr='-double',)
+
+    write_signed = traits.Bool(
+                desc='Write out signed data',
+                argstr='-signed',)
+
+    write_unsigned = traits.Bool(
+                desc='Write out unsigned data',
+                argstr='-unsigned',)
+
+    write_range = traits.Tuple(
+                traits.Float, traits.Float, argstr='-range %f %f', # FIXME check if %f is appropriate
+                desc='Specify the range of output values\nDefault value: 1.79769e+308 1.79769e+308',) # FIXME minctoraw output is missing a negative?
+
+    _xor_normalize = ('normalize', 'nonormalize',)
+
+    normalize = traits.Bool(
+                    desc='Normalize integer pixel values to file max and min',
+                    argstr='-normalize',
+                    xor=_xor_normalize,
+                    mandatory=True)
+
+    nonormalize = traits.Bool(
+                    desc='Turn off pixel normalization',
+                    argstr='-nonormalize',
+                    xor=_xor_normalize,
+                    mandatory=True)
+
+class ToRawOutputSpec(TraitedSpec):
+    # FIXME Not sure if I'm defining the outout specs correctly.
+
+    output_file = File(
+                    desc='output file',
+                    exists=True,
+                    genfile=True,)
+
+class ToRawTask(StdOutCommandLine):
+    input_spec  = ToRawInputSpec
+    output_spec = ToRawOutputSpec
+    cmd = 'minctoraw'
+
+    def _gen_outfilename(self):
+        """
+        Convert foo.mnc to foo.raw.
+        """
+        return os.path.splitext(self.inputs.input_file)[0] + '.raw'
 
 class ConvertInputSpec(CommandLineInputSpec):
     input_file = File(
@@ -53,15 +138,10 @@ class ConvertInputSpec(CommandLineInputSpec):
                         argstr='-chunk %d',)
 
 class ConvertOutputSpec(TraitedSpec):
+    # FIXME Am I defining the output spec correctly?
     output_file = File(
                     desc='output file',
                     exists=True,)
-    provenance_json = File(
-                        desc='provenance file (json)',
-                        exists=True,)
-    provenance_provn = File(
-                        desc='provenance file (provn)',
-                        exists=True,)
 
 class ConvertTask(CommandLine):
     input_spec  = ConvertInputSpec
@@ -71,14 +151,17 @@ class ConvertTask(CommandLine):
     def _list_outputs(self):
         outputs = self.output_spec().get()
         outputs['output_file'] = self.inputs.output_file
-       
-        # FIXME provenance files end up the the current working directory, is this ok?
-        outputs['provenance_json'] = os.path.join(os.getcwd(), 'provenance.json')
-        outputs['provenance_provn'] = os.path.join(os.getcwd(), 'provenance.provn')
-
         return outputs
 
 if __name__ == '__main__':
     c = ConvertTask(input_file='/home/carlo/tmp/foo.mnc', output_file='/tmp/foo.mnc', two=True, clobber=True, compression=3, chunk=2, template=True)
     print c.cmdline
     c.run()
+    
+    print
+    print
+
+    r = ToRawTask(input_file='/home/carlo/tmp/foo.mnc', normalize=True)
+    print r.cmdline
+    r.run()
+
