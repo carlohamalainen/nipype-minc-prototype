@@ -1,4 +1,4 @@
 nipype-minc-prototype
 =====================
 
-Investigating MINC support for nipype
+Investigating MINC support for nipype.
