@@ -14,6 +14,7 @@ from nipype.interfaces.base import (
     StdOutCommandLineInputSpec,
     StdOutCommandLine,
     File,
+    InputMultiPath,
     traits,
 )
 
@@ -276,13 +277,105 @@ class ToEcatTask(CommandLine):
 
     def _gen_filename(self, name):
         if name == 'output_file':
-            return os.path.splitext(self.inputs.input_file)[0] + '.v' 
+            return os.path.splitext(self.inputs.input_file)[0] + '.v'
         return None
+
+class DumpInputSpec(StdOutCommandLineInputSpec):
+    """
+    For the MINC command mincdump.
+    """
+
+    input_file = File(
+                    desc='input file',
+                    exists=True,
+                    mandatory=True,
+                    argstr='%s',
+                    position=-2,)
+
+    _xor_coords_or_header = ('coordinate_data', 'header_data',)
+
+    coordinate_data = traits.Bool(
+                    desc='Coordinate variable data and header information',
+                    argstr='-c',
+                    xor=_xor_coords_or_header,)
+
+    header_data = traits.Bool(
+                    desc='Header information only, no data',
+                    argstr='-h',
+                    xor=_xor_coords_or_header,)
+
+    _xor_annotations = ('annotations_brief', 'annotations_full',)
+
+    # FIXME Instead of an enum, make a separate Bool trait called fortran_indices and another
+    # called c_indices?
+
+    annotations_brief = traits.Enum('c', 'f',
+                            argstr='-b %s',
+                            desc='Brief annotations for C or Fortran indices in data',
+                            xor=_xor_annotations)
+
+    annotations_full = traits.Enum('c', 'f',
+                            argstr='-f %s',
+                            desc='Full annotations for C or Fortran indices in data',
+                            xor=_xor_annotations)
+
+    variables = InputMultiPath(
+                            traits.Str,
+                            desc='Output data for specified variables only',
+                            sep=',',
+                            argstr='-v %s',)
+
+    line_length = traits.Trait(traits.TraitRange(0, None),
+                        desc='Line length maximum in data section (default 80)',
+                        default=0,
+                        usedefault=False,
+                        argstr='-l %d',)
+
+    netcdf_name = traits.Str(
+                        desc='Name for netCDF (default derived from file name)',
+                        argstr='-n %s',)
+
+    precision = traits.Either(
+                        traits.Int(),
+                        traits.Tuple(traits.Int, traits.Int),
+                        desc='Display floating-point values with less precision',
+                        argstr='%s',)
+
+class DumpOutputSpec(TraitedSpec):
+    # FIXME Not sure if I'm defining the outout specs correctly.
+
+    output_file = File(
+                    desc='output file',
+                    exists=True,
+                    genfile=True,)
+
+class DumpTask(StdOutCommandLine):
+    input_spec  = DumpInputSpec
+    output_spec = DumpOutputSpec
+    cmd = 'mincdump'
+
+    def _format_arg(self, name, spec, value):
+        if name == 'precision':
+            if isinstance(value, int):
+                return '-p %d' % value
+            elif isinstance(value, tuple):
+                return '-p %d,%d' % (value[0], value[1],)
+            else:
+                raise NotImplemented # FIXME some other exception?
+        return super(DumpTask, self)._format_arg(name, spec, value)
+
+    # FIXME Are we forced to send outout to a file? Can we pipe it
+    # to another minc command directly?
+    def _gen_outfilename(self):
+        """
+        Dump foo.mnc to foo.txt.
+        """
+        return os.path.splitext(self.inputs.input_file)[0] + '.txt'
 
 if __name__ == '__main__':
     convert = ConvertTask(input_file='/home/carlo/tmp/foo.mnc', output_file='/tmp/foo.mnc', two=True, clobber=True, compression=3, chunk=2, template=True)
     print convert.cmdline
-    convert.run()
+    convert_result = convert.run()
 
     print
     print
@@ -307,3 +400,8 @@ if __name__ == '__main__':
     toecat2 = ToEcatTask(input_file='/home/carlo/tmp/foo.mnc', output_file='/tmp/sdfsdf.v') # output_file specified
     print toecat2.cmdline
 
+    print
+    print
+
+    dump1 = DumpTask(input_file='/home/carlo/tmp/foo.mnc', precision=(3,4), line_length=34, variables=['var1', 'var2', 'var3'],)
+    print dump1.cmdline
