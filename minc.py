@@ -24,6 +24,11 @@ import warnings
 warn = warnings.warn
 warnings.filterwarnings('always', category=UserWarning)
 
+def check_minc():
+    return Info.version() is not None
+
+def no_minc():
+    return not check_minc()
 
 class Info(object):
     """Handle MINC version information.
@@ -46,9 +51,13 @@ class Info(object):
            Version number as string or None if MINC not found
 
         """
-        clout = CommandLine(command='mincinfo',
-                            args='-version',
-                            terminal_output='allatonce').run()
+        try:
+            clout = CommandLine(command='mincinfo',
+                                args='-version',
+                                terminal_output='allatonce').run()
+        except IOError:
+            return None
+
         out = clout.runtime.stdout
 
         def read_program_version(s):
