@@ -20,6 +20,73 @@ from nipype.interfaces.base import (
 
 import os
 
+import warnings
+warn = warnings.warn
+warnings.filterwarnings('always', category=UserWarning)
+
+
+class Info(object):
+    """Handle MINC version information.
+
+    version refers to the version of MINC on the system
+
+    """
+
+    @staticmethod
+    def version():
+        """Check for minc version on the system
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        version : str
+           Version number as string or None if MINC not found
+
+        """
+        clout = CommandLine(command='mincinfo',
+                            args='-version',
+                            terminal_output='allatonce').run()
+        out = clout.runtime.stdout
+
+        def read_program_version(s):
+            if 'program' in s:
+                return s.split(':')[1].strip()
+            return None
+
+        def read_libminc_version(s):
+            if 'libminc' in s:
+                return s.split(':')[1].strip()
+            return None
+
+        def read_netcdf_version(s):
+            if 'netcdf' in s:
+                return ' '.join(s.split(':')[1:]).strip()
+            return None
+
+        def read_hdf5_version(s):
+            if 'HDF5' in s:
+                return s.split(':')[1].strip()
+            return None
+
+        versions = {'minc':    None,
+                    'libminc': None,
+                    'netcdf':  None,
+                    'hdf5':    None,
+                   }
+
+        for l in out.split('\n'):
+            for (name, f) in [('minc',      read_program_version),
+                              ('libminc',   read_libminc_version),
+                              ('netcdf',    read_netcdf_version),
+                              ('hdf5',      read_hdf5_version),
+                             ]:
+                if f(l) is not None: versions[name] = f(l)
+
+        return versions
+
 class ToRawInputSpec(StdOutCommandLineInputSpec):
     """
     For the MINC command minctoraw.
