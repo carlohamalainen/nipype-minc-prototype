@@ -448,6 +448,119 @@ class DumpTask(StdOutCommandLine):
         """
         return os.path.splitext(self.inputs.input_file)[0] + '.txt'
 
+"""
+
+UP TO HERE
+
+ -range:                 Valid range for output data.
+		Default value: 0 0
+ -sdfile:                Specify an output sd file (default=none).
+ -copy_header:           Copy all of the header from the first file (default for one file).
+ -nocopy_header:         Do not copy all of the header from the first file (default for many files)).
+ -avgdim:                Specify a dimension along which we wish to average.
+ -binarize:              Binarize the volume by looking for values in a given range.
+ -binrange:              Specify a range for binarization.
+		Default value: 1.79769e+308 -1.79769e+308
+ -binvalue:              Specify a target value (+/- 0.5) for binarization.
+		Default value: -1.79769e+308
+ -weights:               Specify weights for averaging ("<w1>,<w2>,...").
+ -width_weighted:        Weight by dimension widths when -avgdim is used.
+Generic options for all commands:
+ -help:                  Print summary of command-line options and abort
+ -version:               Print version number of program and exit
+
+Usage: mincaverage [options] [<in1.mnc> ...] <out.mnc>
+       mincaverage -help
+"""
+
+
+class AverageInputSpec(CommandLineInputSpec):
+    input_files = InputMultiPath(
+                    traits.File,
+                    desc='input file(s) for averaging',
+                    exists=True,
+                    mandatory=True,
+                    sep=' ', # FIXME test with files that contain spaces - does InputMultiPath do the right thing?
+                    argstr='%s',
+                    position=-2,)
+
+    output_file = File(
+                    desc='output file',
+                    mandatory=True,
+                    genfile=False,
+                    argstr='%s',
+                    position=-1,)
+
+    two = traits.Bool(desc='Produce a MINC 2.0 format output file', argstr='-2')
+
+    _xor_clobber = ('clobber', 'no_clobber')
+
+    clobber     = traits.Bool(desc='Overwrite existing file.',                  argstr='-clobber',      xor=_xor_clobber)
+    no_clobber  = traits.Bool(desc='Don\'t overwrite existing file (default).', argstr='-noclobber',    xor=_xor_clobber)
+
+    _xor_verbose = ('verbose', 'quiet',)
+
+    verbose = traits.Bool(desc='Print out log messages (default).', argstr='-verbose',  xor=_xor_verbose)
+    quiet   = traits.Bool(desc='Do not print out log messages.',    argstr='-quiet',    xor=_xor_verbose)
+
+    debug   = traits.Bool(desc='Print out debugging messages.', argstr='-debug')
+
+    # FIXME How to handle stdin option here? Not relevant?
+    foo = traits.File(desc='Specify the name of a file containing input file names (- for stdin).', argstr='-filelist %s',)
+
+    _xor_check_dimensions = ('check_dimensions', 'no_check_dimensions',)
+
+    check_dimensions    = traits.Bool(desc='Check that dimension info matches across files (default).', argstr='-check_dimensions',     xor=_xor_check_dimensions)
+    no_check_dimensions = traits.Bool(desc='Do not check dimension info.',                              argstr='-nocheck_dimensions',   xor=_xor_check_dimensions)
+
+
+    # FIXME mincaverage seems to accept more than one of these options; I assume
+    # that it takes the last one, and it makes more sense for these to be
+    # put into an xor case.
+
+    _xor_format = ('format_filetype', 'format_byte', 'format_short',
+                   'format_int', 'format_long', 'format_float', 'format_double',
+                   'format_signed', 'format_unsigned',)
+
+    format_filetype     = traits.Bool(desc='Use data type of first file (default).',                    argstr='-filetype', xor=_xor_format)
+    format_byte         = traits.Bool(desc='Write out byte data.',                                      argstr='-byte',     xor=_xor_format)
+    format_short        = traits.Bool(desc='Write out short integer data.',                             argstr='-short',    xor=_xor_format)
+    format_int          = traits.Bool(desc='Write out 32-bit integer data.',                            argstr='-int',      xor=_xor_format)
+    format_long         = traits.Bool(desc='Superseded by -int.',                                       argstr='-long',     xor=_xor_format)
+    format_float        = traits.Bool(desc='Write out single-precision floating-point data.',           argstr='-float',    xor=_xor_format)
+    format_double       = traits.Bool(desc='Write out double-precision floating-point data.',           argstr='-double',   xor=_xor_format)
+    format_signed       = traits.Bool(desc='Write signed integer data.',                                argstr='-signed',   xor=_xor_format)
+    format_unsigned     = traits.Bool(desc='Write unsigned integer data (default if type specified).',  argstr='-unsigned', xor=_xor_format) # FIXME mark with default=?
+
+
+    max_buffer_size_in_kb = traits.Trait(traits.TraitRange(0, None),
+                                desc='Specify the maximum size of the internal buffers (in kbytes).',
+                                default=4096, # FIXME is this doing what I think it's doing? Write some tests.
+                                usedefault=False,
+                                argstr='-max_buffer_size_in_kb %d',)
+
+    _xor_normalize = ('normalize', 'nonormalize',)
+    normalize   = traits.Bool(desc='Normalize data sets for mean intensity.', argstr='-normalize', xor=_xor_normalize)
+    nonormalize = traits.Bool(desc='Do not normalize data sets (default).',   argstr='-nonormalize', xor=_xor_normalize, default=True) # FIXME check default=? behaviour
+
+class AverageOutputSpec(TraitedSpec):
+    # FIXME Am I defining the output spec correctly?
+    output_file = File(
+                    desc='output file',
+                    exists=True,)
+
+class AverageTask(CommandLine):
+    input_spec  = AverageInputSpec
+    output_spec = AverageOutputSpec
+    cmd = 'mincaverage'
+
+    def _list_outputs(self):
+        # FIXME seems generic, is this necessary?
+        outputs = self.output_spec().get()
+        outputs['output_file'] = self.inputs.output_file
+        return outputs
+
+
 if __name__ == '__main__':
     convert = ConvertTask(input_file='/home/carlo/tmp/foo.mnc', output_file='/tmp/foo.mnc', two=True, clobber=True, compression=3, chunk=2, template=True)
     print convert.cmdline
