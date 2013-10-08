@@ -141,7 +141,7 @@ class ToRawInputSpec(StdOutCommandLineInputSpec):
                 argstr='-unsigned',)
 
     write_range = traits.Tuple(
-                traits.Float, traits.Float, argstr='-range %f %f', # FIXME check if %f is appropriate
+                traits.Float, traits.Float, argstr='-range %s %s',
                 desc='Specify the range of output values\nDefault value: 1.79769e+308 1.79769e+308',) # FIXME minctoraw output is missing a negative?
 
     _xor_normalize = ('normalize', 'nonormalize',)
@@ -448,32 +448,6 @@ class DumpTask(StdOutCommandLine):
         """
         return os.path.splitext(self.inputs.input_file)[0] + '.txt'
 
-"""
-
-UP TO HERE
-
- -range:                 Valid range for output data.
-		Default value: 0 0
- -sdfile:                Specify an output sd file (default=none).
- -copy_header:           Copy all of the header from the first file (default for one file).
- -nocopy_header:         Do not copy all of the header from the first file (default for many files)).
- -avgdim:                Specify a dimension along which we wish to average.
- -binarize:              Binarize the volume by looking for values in a given range.
- -binrange:              Specify a range for binarization.
-		Default value: 1.79769e+308 -1.79769e+308
- -binvalue:              Specify a target value (+/- 0.5) for binarization.
-		Default value: -1.79769e+308
- -weights:               Specify weights for averaging ("<w1>,<w2>,...").
- -width_weighted:        Weight by dimension widths when -avgdim is used.
-Generic options for all commands:
- -help:                  Print summary of command-line options and abort
- -version:               Print version number of program and exit
-
-Usage: mincaverage [options] [<in1.mnc> ...] <out.mnc>
-       mincaverage -help
-"""
-
-
 class AverageInputSpec(CommandLineInputSpec):
     input_files = InputMultiPath(
                     traits.File,
@@ -482,7 +456,7 @@ class AverageInputSpec(CommandLineInputSpec):
                     mandatory=True,
                     sep=' ', # FIXME test with files that contain spaces - does InputMultiPath do the right thing?
                     argstr='%s',
-                    position=-2,)
+                    position=-2,) # FIXME test with multiple files, is order ok?
 
     output_file = File(
                     desc='output file',
@@ -543,6 +517,37 @@ class AverageInputSpec(CommandLineInputSpec):
     normalize   = traits.Bool(desc='Normalize data sets for mean intensity.', argstr='-normalize', xor=_xor_normalize)
     nonormalize = traits.Bool(desc='Do not normalize data sets (default).',   argstr='-nonormalize', xor=_xor_normalize, default=True) # FIXME check default=? behaviour
 
+    voxel_range = traits.Tuple(
+                traits.Int, traits.Int, argstr='-range %d %d',
+                desc='Valid range for output data.',)
+
+    sdfile = traits.File(
+                desc='Specify an output sd file (default=none).',
+                argstr='-sdfile %s',)
+
+    _xor_copy_header = ('copy_header, no_copy_header')
+
+    copy_header     = traits.Bool(desc='Copy all of the header from the first file (default for one file).',            argstr='-copy_header',   xor=_xor_copy_header)
+    no_copy_header  = traits.Bool(desc='Do not copy all of the header from the first file (default for many files)).',  argstr='-nocopy_header', xor=_xor_copy_header)
+
+    avgdim = traits.Str(desc='Specify a dimension along which we wish to average.', argstr='-avgdim %s')
+
+    binarize = traits.Bool(desc='Binarize the volume by looking for values in a given range.', argstr='-binarize')
+
+    binrange = traits.Tuple(
+                traits.Float, traits.Float, argstr='-binrange %s %s',
+                desc='Specify a range for binarization. Default value: 1.79769e+308 -1.79769e+308.') # FIXME shouldn't that be -1.79769e+308 1.79769e+308? Min then max?
+
+    binvalue = traits.Float(desc='Specify a target value (+/- 0.5) for binarization. Default value: -1.79769e+308', argstr='-binvalue %s')
+		
+    weights = InputMultiPath(
+                            traits.Str,
+                            desc='Specify weights for averaging ("<w1>,<w2>,...").',
+                            sep=',',
+                            argstr='-weights %s',)
+
+    width_weighted = traits.Bool(desc='Weight by dimension widths when -avgdim is used.', argstr='-width_weighted', requires=('avgdim',))
+
 class AverageOutputSpec(TraitedSpec):
     # FIXME Am I defining the output spec correctly?
     output_file = File(
@@ -592,5 +597,14 @@ if __name__ == '__main__':
     print
     print
 
-    dump1 = DumpTask(input_file='/home/carlo/tmp/foo.mnc', precision=(3,4), line_length=34, variables=['var1', 'var2', 'var3'],)
+    dump1 = DumpTask(input_file='/home/carlo/tmp/foo.mnc', precision=(3,4), line_length=34, variables=['image'],)
     print dump1.cmdline
+    dump1.run()
+
+    print
+    print
+
+    average1 = AverageTask(input_files=['/home/carlo/tmp/foo.mnc', '/home/carlo/tmp/foo.mnc'], output_file='/home/carlo/tmp/foo_averaged.mnc', width_weighted=True, avgdim='image', binvalue=-1.123123213e+200)
+    print average1.cmdline
+
+
